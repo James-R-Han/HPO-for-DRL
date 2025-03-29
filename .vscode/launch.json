@@ -1,0 +1,26 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "HPO for RL",
+            "type": "python",
+            "request": "launch",
+            "program": "/home/jha/HPO-for-DRL/train_drl.py",
+            "cwd": "/home/jha/HPO-for-DRL",
+            "console": "integratedTerminal",
+            "python": "/home/jha/anaconda3/envs/drl-hpo/bin/python",
+            "debugOptions": [
+                "WaitOnAbnormalExit",
+                "WaitOnNormalExit",
+                "RedirectOutput"
+              ],
+              "env": {
+                "PYTHONPATH": "${workspaceFolder}:/home/jha/HPO-for-DRL",
+              },
+              "envFile": "/home/jha/drl-hpo/.env",
+        },
+    ]
+}
