@@ -3,12 +3,13 @@ import shutil
 import pickle
 from itertools import product
 from copy import deepcopy
+import random
 
 import gymnasium as gym
 import numpy as np
 from tqdm import tqdm
 import torch
-import random
+from cmaes import CMA
 
 from stable_baselines3 import DQN, PPO
 from stable_baselines3.common.evaluation import evaluate_policy
@@ -278,12 +279,67 @@ class HPO_for_DRL:
         return best_hparams, best_hparams_idx
     
     def CMAES(self):
-        pass
+        bounds = self.DRL_algo_params_bounds
+        hparam_order = list(bounds.keys())
+        dim = len(hparam_order)
+
+        lower_bounds = np.array([bounds[h][0] for h in hparam_order])
+        upper_bounds = np.array([bounds[h][1] for h in hparam_order])
+        mean = (lower_bounds + upper_bounds) / 2
+        sigma = 0.3 * np.mean(upper_bounds - lower_bounds)
+
+        optimizer = CMA(mean=mean, sigma=sigma, bounds=np.stack([lower_bounds, upper_bounds], axis=1))
+
+        reward_over_runs = []
+        best_hparams = None
+        best_reward = -np.inf
+        best_idx = -1
+
+        budget = self.config_HPO.CMAES_config["budget"]
+        for i in tqdm(range(budget)):
+            x = optimizer.ask()
+            hparams = {}
+            for j, h in enumerate(hparam_order):
+                if h in ["n_steps", "batch_size"]:
+                    hparams[h] = int(np.round(x[j]))
+                else:
+                    hparams[h] = float(x[j])
+
+            with open(os.path.join(self.save_path, f"hyperparams/hyperparams_{i}.pkl"), "wb") as f:
+                pickle.dump(hparams, f)
+
+            rewards = []
+            for seed in self.config_training.training_seeds:
+                self.set_seed(seed)
+                model = self.train_model(self.env, self.DRL_algo, hparams)
+                reward = self.evaluate_model(model, self.num_eval_episodes, run_idx=i)
+                rewards.append(reward)
+
+            mean_reward = np.mean(rewards)
+            optimizer.tell(x, -mean_reward)  # CMA-ES minimizes, so we negate
+
+            reward_over_runs.append(mean_reward)
+            np.save(os.path.join(self.save_path, "reward_over_runs.npy"), np.array(reward_over_runs))
+
+            if mean_reward > best_reward:
+                best_reward = mean_reward
+                best_hparams = hparams
+                best_idx = i
+
+            with open(os.path.join(self.save_path, "reward_over_runs_num_runs.txt"), "w") as f:
+                f.write(f"Number of runs: {len(reward_over_runs)}\n")
+                f.write(f"Mean reward over runs: {np.mean(reward_over_runs)}\n")
+
+        return best_hparams, best_idx
 
     def train_model(self, env, DRL_algo, hparams):
         """
         Train the model with the given hyperparameters.
         """
+        
+        lr_in_logscale = hparams["learning_rate"]
+        hparams["learning_rate"] = 10 ** lr_in_logscale
+        
         if DRL_algo == "PPO":
             # Note SB3 throws me a warning that we should use cpu for PPO
             model = PPO("MlpPolicy", env, verbose=1, device='cpu', tensorboard_log=os.path.join(self.save_path, "tb_logs"), **hparams)

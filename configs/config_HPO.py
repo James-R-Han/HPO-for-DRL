@@ -7,7 +7,7 @@ from config_base import ConfigBase
 
 
 PPO_BOUNDS = {
-    "learning_rate": (1e-6, 1e-1),
+    "learning_rate": (-6, -1), # This is in log scale
     "n_steps": (64, 4096),      # though n_steps should be integer
     "batch_size": (8, 2048),   # also integer
     "gamma": (0.75, 0.9999),
@@ -15,7 +15,7 @@ PPO_BOUNDS = {
 }
 
 DQN_BOUNDS = {
-    "learning_rate": (1e-6, 1e-1),
+    "learning_rate": (-6, -1), # This is in log scale
     "batch_size": (8, 2048),
     "exploration_fraction": (0.01, 0.75),
     "gamma": (0.75, 0.999),

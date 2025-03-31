@@ -9,7 +9,7 @@ class ConfigTraining:
     VALID_ALGOS = ["DQN", "PPO"]
     VALID_ENVS = ["CartPole-v1", "MountainCar-v0", "LunarLander-v3"]
     VALID_HPO_ALGOS = ["RS", "GS", "DE", "CMAES"]
-    TIMESTEPS = {"CartPole-v1": 5000 , "MountainCar-v0": 500000, "LunarLander-v3": 1000000}
+    TIMESTEPS = {"CartPole-v1": 100000 , "MountainCar-v0": 500000, "LunarLander-v3": 1000000}
     #100000
     def __init__(self):
         self.device = 'cuda'
