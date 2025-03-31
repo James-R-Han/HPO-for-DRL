@@ -25,7 +25,7 @@ class ConfigHPO:
     def __init__(self):
         super().__init__()
         
-        self.HPO_budget = 128
+        self.HPO_budget = 48
         self.bounds = {}
         self.bounds["PPO"] = PPO_BOUNDS
         self.bounds["DQN"] = DQN_BOUNDS
@@ -41,8 +41,8 @@ class ConfigHPO:
         GS_config = {}
         
         PPO_GS_config = {}
-        PPO_GS_config["learning_rate"] = 4
-        PPO_GS_config["n_steps"] = 4
+        PPO_GS_config["learning_rate"] = 2
+        PPO_GS_config["n_steps"] = 3
         PPO_GS_config["batch_size"] = 2
         PPO_GS_config["gamma"] = 2
         PPO_GS_config["gae_lambda"] = 2
@@ -50,9 +50,9 @@ class ConfigHPO:
         GS_config["PPO"] = PPO_GS_config
         
         DQN_GS_config = {}
-        DQN_GS_config["learning_rate"] = 4
-        DQN_GS_config["batch_size"] = 4
-        DQN_GS_config["exploration_fraction"] = 2
+        DQN_GS_config["learning_rate"] = 2
+        DQN_GS_config["batch_size"] = 2
+        DQN_GS_config["exploration_fraction"] = 3
         DQN_GS_config["gamma"] = 4
         GS_config["DQN"] = DQN_GS_config
         self.GS_config = GS_config
@@ -66,9 +66,9 @@ class ConfigHPO:
         DE_config = {}
         
         # note F will be randomly sampled following Appendix A of https://arxiv.org/pdf/2105.09821
-        DE_config["pop_size"] = 10
-        DE_config["max_gens"] = 11
-        DE_config["crossover_probability"] = 0.7
+        DE_config["pop_size"] = 6
+        DE_config["max_gens"] = 7
+        DE_config["crossover_probability"] = 0.75
         
         DE_budget = DE_config["pop_size"] * (DE_config["max_gens"] + 1)
         self.DE_config = DE_config
@@ -78,6 +78,6 @@ class ConfigHPO:
         # Covariance Matrix Adaptation Evolution Strategy (CMA-ES)
         CMAES_config = {}
         
-        CMAES_config["pop_size"] = 10
-        CMAES_config["max_gens"] = 11
+        CMAES_config["pop_size"] = 6
+        CMAES_config["max_gens"] = 7
         

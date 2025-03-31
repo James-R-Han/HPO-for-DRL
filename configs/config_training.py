@@ -7,23 +7,24 @@ from config_base import ConfigBase
 
 class ConfigTraining:
     VALID_ALGOS = ["DQN", "PPO"]
-    VALID_ENVS = ["CartPole-v1", "MountainCar-v0", "LunarLander-v2"]
+    VALID_ENVS = ["CartPole-v1", "MountainCar-v0", "LunarLander-v3"]
     VALID_HPO_ALGOS = ["RS", "GS", "DE", "CMAES"]
-    TIMESTEPS = {"CartPole-v1": 100000, "MountainCar-v0": 500000, "LunarLander-v2": 1000000}
-    
-    
+    TIMESTEPS = {"CartPole-v1": 5000 , "MountainCar-v0": 500000, "LunarLander-v3": 1000000}
+    #100000
     def __init__(self):
         self.device = 'cuda'
         
         self.DRL_algo = "PPO"  # or "DQN"
-        self.HPO_algo = "GS"
+        self.HPO_algo = "DE"
         self.env_id = "CartPole-v1"
+        self.training_seeds = [0,1]
+        self.testing_seeds = [2,3,4,5,6]
         
         self.training_timesteps = self.TIMESTEPS[self.env_id]
         self.num_eval_episodes = 100
         
         self.identifier = f"{self.DRL_algo}_{self.env_id}_{self.HPO_algo}"
-        self.save_path = f"/home/jha/HPO-for-DRL/results/{self.identifier}"
+        self.save_path = f"/home/jha/HPO-for-DRL/results/{self.env_id}/{self.identifier}"
         
         assert self.DRL_algo in self.VALID_ALGOS, f"Invalid DRL algorithm: {self.DRL_algo}. Valid options are: {self.VALID_ALGOS}"
         assert self.HPO_algo in self.VALID_HPO_ALGOS, f"Invalid HPO algorithm: {self.HPO_algo}. Valid options are: {self.VALID_HPO_ALGOS}"
