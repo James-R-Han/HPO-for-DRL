@@ -79,5 +79,11 @@ class ConfigHPO:
         CMAES_config = {}
         
         CMAES_config["pop_size"] = 6
-        CMAES_config["max_gens"] = 7
+        CMAES_config["max_gens"] = 8
+        
+        CMAES_budget = CMAES_config["pop_size"] * CMAES_config["max_gens"]
+        self.CMAES_config = CMAES_config
+        
+        assert CMAES_budget <= self.HPO_budget, f"CMAES budget {CMAES_budget} exceeds HPO budget {self.HPO_budget}"
+        ###########################################
         

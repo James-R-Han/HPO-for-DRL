@@ -201,9 +201,10 @@ class HPO_for_DRL:
         
         # Evaluate the fitness of the initial population
         fitness_of_population = []
+        run_idx = 0
         for idx, (individual_hparam, individual_vector) in enumerate(current_population):
             # save hparams
-            with open(os.path.join(self.save_path, f"hyperparams/hyperparams_0_{idx}.pkl"), "wb") as f:
+            with open(os.path.join(self.save_path, f"hyperparams/hyperparams_{run_idx}.pkl"), "wb") as f:
                 pickle.dump(individual_hparam, f)
             
             reward_over_seeds = []
@@ -223,6 +224,11 @@ class HPO_for_DRL:
             with open(os.path.join(self.save_path, "reward_over_runs_num_runs.txt"), "w") as f:
                 f.write(f"Number of runs: {len(reward_over_runs)}\n")
                 f.write(f"Mean reward over runs: {np.mean(np.array(reward_over_runs))}\n")
+                
+            with open(os.path.join(self.save_path, "reward_over_runs_with_children_num_runs.txt"), "w") as f:
+                f.write(f"Number of runs: {len(reward_over_runs_with_children)}\n")
+                f.write(f"Mean reward over runs: {np.mean(np.array(reward_over_runs_with_children))}\n")
+            run_idx += 1
         
         for generation in tqdm(range(generations)):
             clone_of_current_population = deepcopy(current_population)
@@ -242,13 +248,13 @@ class HPO_for_DRL:
                 for seed in self.config_training.training_seeds:
                     self.set_seed(seed)
                     model = self.train_model(self.env, self.DRL_algo, mutant_hparams)
-                    mean_reward_for_this_seed = self.evaluate_model(model, self.num_eval_episodes, run_idx=(generation+1)*len(current_population)+child)
+                    mean_reward_for_this_seed = self.evaluate_model(model, self.num_eval_episodes, run_idx=run_idx)
                     reward_over_seeds.append(mean_reward_for_this_seed)
                 mean_reward = np.mean(np.array(reward_over_seeds))
                 reward_over_runs_with_children.append(mean_reward) 
                 
                 
-                with open(os.path.join(self.save_path, f"hyperparams/hyperparams_{generation+1}_{child}_mutant.pkl"), "wb") as f:
+                with open(os.path.join(self.save_path, f"hyperparams/hyperparams_{run_idx}_mutant.pkl"), "wb") as f:
                         pickle.dump(mutant_hparams, f)
                 
                 # Select the better of the two individuals
@@ -259,8 +265,10 @@ class HPO_for_DRL:
                 
                 reward_over_runs.append(fitness_of_population[child])
                 
-                with open(os.path.join(self.save_path, f"hyperparams/hyperparams_{generation+1}_{child}.pkl"), "wb") as f:
+                with open(os.path.join(self.save_path, f"hyperparams/hyperparams_{run_idx}.pkl"), "wb") as f:
                     pickle.dump(current_population[child][0], f)
+                    
+                run_idx += 1
             
             # save per generation
             np.save(os.path.join(self.save_path, "reward_over_runs.npy"), np.array(reward_over_runs))
@@ -272,65 +280,80 @@ class HPO_for_DRL:
             with open(os.path.join(self.save_path, "reward_over_runs_with_children_num_runs.txt"), "w") as f:
                 f.write(f"Number of runs: {len(reward_over_runs_with_children)}\n")
                 f.write(f"Mean reward over runs: {np.mean(np.array(reward_over_runs_with_children))}\n") # should be less than the reward_over_runs
+                
             
         # Save the best hyperparameters
-        best_hparams_idx = np.argmax(fitness_of_population)
+        best_hparams_idx = np.argmax(reward_over_runs)
         best_hparams = pickle.load(open(os.path.join(self.save_path, f"hyperparams/hyperparams_{best_hparams_idx}.pkl"), "rb"))
         return best_hparams, best_hparams_idx
     
     def CMAES(self):
+        """
+        The approach I'm taking here is to work in normalized space for CMAES and then denormalize the CAMES parameters into the appropriate range.
+        I'm doing this because different hyperparameters vary quite significantly in scale.
+        Also this is package reference: https://github.com/CyberAgentAILab/cmaes?tab=readme-ov-file
+        """
+        
         bounds = self.DRL_algo_params_bounds
-        hparam_order = list(bounds.keys())
-        dim = len(hparam_order)
+        hparam_names = list(bounds.keys())
+        dim = len(hparam_names)
 
-        lower_bounds = np.array([bounds[h][0] for h in hparam_order])
-        upper_bounds = np.array([bounds[h][1] for h in hparam_order])
-        mean = (lower_bounds + upper_bounds) / 2
-        sigma = 0.3 * np.mean(upper_bounds - lower_bounds)
+        def denormalize(norm_params):
+            """Convert normalized [0,1] params to original scale."""
+            hparams = {}
+            for i, name in enumerate(hparam_names):
+                low, high = bounds[name]
+                val = norm_params[i] * (high - low) + low
+                if name in ["n_steps", "batch_size"]:
+                    val = int(np.clip(round(val), low, high))
+                else:
+                    val = np.clip(val, low, high)
+                hparams[name] = val
+            return hparams
 
-        optimizer = CMA(mean=mean, sigma=sigma, bounds=np.stack([lower_bounds, upper_bounds], axis=1))
+        # Initialize CMA-ES in normalized space
+        optimizer = CMA(mean=np.full(dim, 0.5), sigma=0.3, bounds=np.stack([np.zeros(dim), np.ones(dim)],axis=1), population_size=self.config_HPO.CMAES_config["pop_size"])
 
         reward_over_runs = []
-        best_hparams = None
-        best_reward = -np.inf
-        best_idx = -1
+        
+        run_idx = 0
+        for generation in range(self.config_HPO.CMAES_config["max_gens"]):
+            solutions = []
+            for _ in range(self.config_HPO.CMAES_config["pop_size"]):
+                x = optimizer.ask()
+                hparams = denormalize(x)
 
-        budget = self.config_HPO.CMAES_config["budget"]
-        for i in tqdm(range(budget)):
-            x = optimizer.ask()
-            hparams = {}
-            for j, h in enumerate(hparam_order):
-                if h in ["n_steps", "batch_size"]:
-                    hparams[h] = int(np.round(x[j]))
-                else:
-                    hparams[h] = float(x[j])
+                # Save hparams
+                with open(os.path.join(self.save_path, f"hyperparams/hyperparams_{run_idx}.pkl"), "wb") as f:
+                    pickle.dump(hparams, f)
 
-            with open(os.path.join(self.save_path, f"hyperparams/hyperparams_{i}.pkl"), "wb") as f:
-                pickle.dump(hparams, f)
+                # Evaluate reward across seeds
+                rewards_over_seeds = []
+                for seed in self.config_training.training_seeds:
+                    self.set_seed(seed)
+                    model = self.train_model(self.env, self.DRL_algo, hparams)
+                    reward = self.evaluate_model(model, self.num_eval_episodes, run_idx=run_idx)
+                    rewards_over_seeds.append(reward)
 
-            rewards = []
-            for seed in self.config_training.training_seeds:
-                self.set_seed(seed)
-                model = self.train_model(self.env, self.DRL_algo, hparams)
-                reward = self.evaluate_model(model, self.num_eval_episodes, run_idx=i)
-                rewards.append(reward)
+                mean_reward = np.mean(rewards_over_seeds)
+                reward_over_runs.append(mean_reward)
+                solutions.append((x, -mean_reward))  # Note that CMA-ES minimizes
 
-            mean_reward = np.mean(rewards)
-            optimizer.tell(x, -mean_reward)  # CMA-ES minimizes, so we negate
+                run_idx += 1
 
-            reward_over_runs.append(mean_reward)
+            # Update CMA-ES
+            optimizer.tell(solutions)
+
+            # Save progress
             np.save(os.path.join(self.save_path, "reward_over_runs.npy"), np.array(reward_over_runs))
-
-            if mean_reward > best_reward:
-                best_reward = mean_reward
-                best_hparams = hparams
-                best_idx = i
-
             with open(os.path.join(self.save_path, "reward_over_runs_num_runs.txt"), "w") as f:
                 f.write(f"Number of runs: {len(reward_over_runs)}\n")
                 f.write(f"Mean reward over runs: {np.mean(reward_over_runs)}\n")
 
-        return best_hparams, best_idx
+        # Save the best hyperparameters
+        best_hparams_idx = np.argmax(reward_over_runs)
+        best_hparams = pickle.load(open(os.path.join(self.save_path, f"hyperparams/hyperparams_{best_hparams_idx}.pkl"), "rb"))
+        return best_hparams, best_hparams_idx
 
     def train_model(self, env, DRL_algo, hparams):
         """
