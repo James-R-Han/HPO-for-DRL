@@ -153,7 +153,8 @@ class HPO_for_DRL:
             if hparam in ["n_steps", "batch_size"]:
                 gridded_values = np.round(gridded_values).astype(int)
                 # I'm writing this for correctness but all hparam bounds are convex sets
-                gridded_values = np.clip(gridded_values, low, high) 
+                gridded_values = np.clip(gridded_values, low, high)
+
             param_grid[hparam] = gridded_values
         
         
@@ -361,13 +362,14 @@ class HPO_for_DRL:
         """
         
         lr_in_logscale = hparams["learning_rate"]
-        hparams["learning_rate"] = 10 ** lr_in_logscale
+        hparams_copy = deepcopy(hparams)
+        hparams_copy["learning_rate"] = 10 ** lr_in_logscale
         
         if DRL_algo == "PPO":
             # Note SB3 throws me a warning that we should use cpu for PPO
-            model = PPO("MlpPolicy", env, verbose=1, device='cpu', tensorboard_log=os.path.join(self.save_path, "tb_logs"), **hparams)
+            model = PPO("MlpPolicy", env, verbose=1, device='cpu', tensorboard_log=os.path.join(self.save_path, "tb_logs"), **hparams_copy)
         elif DRL_algo == "DQN":
-            model = DQN("MlpPolicy", env, verbose=1, device=self.device, tensorboard_log=os.path.join(self.save_path, "tb_logs"), **hparams)
+            model = DQN("MlpPolicy", env, verbose=1, device=self.device, tensorboard_log=os.path.join(self.save_path, "tb_logs"), **hparams_copy)
         
         # Train the model
         model.learn(total_timesteps=self.training_timesteps)
