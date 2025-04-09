@@ -14,8 +14,8 @@ class ConfigTraining:
     def __init__(self):
         self.device = 'cuda'
         
-        self.DRL_algo = "DQN"  # or "DQN"
-        self.HPO_algo = "DE"
+        self.DRL_algo = "PPO"  # or "DQN"
+        self.HPO_algo = "CMAES"
         self.env_id = "MountainCar-v0"
         self.training_seeds = [0,1]
         self.testing_seeds = [2,3,4,5,6]
