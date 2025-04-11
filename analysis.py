@@ -10,13 +10,17 @@ import pickle
 save_path = "/home/jha/HPO-for-DRL/analysis/"
 os.makedirs(save_path, exist_ok=True)
 
-envs = ["CartPole-v1"]#, "LunarLander-v3"]#, "MountainCar-v0"]#
+envs = ["CartPole-v1", "MountainCar-v0", "LunarLander-v3"]#, "MountainCar-v0"]#
 DRL_algos = ["DQN", "PPO"]
 HPO_algos = ["RS", "GS", "DE", "CMAES"]
 
 def normalize_reward(target, base):
-    return (target-base)/base
+    return (target-base)/np.abs(base)
 
+total_count = 0
+best_GS_relative_to_best_RS = 0
+best_DE_relative_to_best_RS = 0
+best_CMAES_relative_to_best_RS = 0
 for env in envs:
     for DRL_algo in DRL_algos:
         HPO_algo_to_reward_info = {}
@@ -43,6 +47,14 @@ for env in envs:
                 "max_best_hparams_testing": reward_of_best_hparams,
                 "reward_over_search": reward_over_runs,
             }
+            
+            with open(f"{save_path}/all_results.txt", 'a') as file:
+                file.write(f"{env}-{DRL_algo}-{HPO_algo}: {reward_of_best_hparams}\n")
+
+        best_GS_relative_to_best_RS += normalize_reward(HPO_algo_to_reward_info["GS"]["max_best_hparams_testing"], HPO_algo_to_reward_info["RS"]["max_best_hparams_testing"])  
+        best_CMAES_relative_to_best_RS += normalize_reward(HPO_algo_to_reward_info["CMAES"]["max_best_hparams_testing"], HPO_algo_to_reward_info["RS"]["max_best_hparams_testing"])
+        best_DE_relative_to_best_RS += normalize_reward(HPO_algo_to_reward_info["DE"]["max_best_hparams_testing"], HPO_algo_to_reward_info["RS"]["max_best_hparams_testing"])
+        total_count += 1
 
         # plot the results
         plt.figure(figsize=(10, 6))
@@ -195,3 +207,8 @@ for env in envs:
         plt.savefig(f"{save_path_specific}/norm_reward_progression_vs_RSbest.png")
         plt.close()
 
+
+print(f"Best GS relative to best RS: {best_GS_relative_to_best_RS/total_count}")
+print(f"Best DE relative to best RS: {best_DE_relative_to_best_RS/total_count}")
+print(f"Best CMAES relative to best RS: {best_CMAES_relative_to_best_RS/total_count}")
+print(f"Total count: {total_count}")
